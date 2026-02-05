@@ -8,6 +8,11 @@ module.exports = [
           console: "readonly",
           process: "readonly",
           fetch: "readonly",
+          describe: "readonly", // Jest globals
+          test: "readonly",
+          expect: "readonly",
+          beforeEach: "readonly",
+          afterEach: "readonly"
         },
       },
       rules: {
