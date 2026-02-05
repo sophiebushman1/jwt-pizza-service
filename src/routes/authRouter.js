@@ -111,4 +111,4 @@ function readAuthToken(req) {
   return null;
 }
 
-module.exports = { authRouter, setAuthUser, setAuth };
+module.exports = authRouter;
