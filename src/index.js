@@ -1,3 +1,5 @@
+console.log("INDEX.JS LOADED");
+
 const app = require('./service.js');
 
 const port = process.argv[2] || 3000;
