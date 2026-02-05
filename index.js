@@ -1,6 +1,34 @@
-const app = require('./service.js');
+class Info {
+  constructor() {
+    this.data = [];
+  }
+}
 
-const port = process.argv[2] || 3000;
-app.listen(port, () => {
-  console.log(`Service started on port ${port}`);
-});
+class Weather extends Info {
+  constructor() {
+    super();
+  }
+
+  report(weatherInfo) {
+    this.data.push(weatherInfo);
+  }
+
+  getAverageTemperature() {
+    let sum = 0;
+
+    if (this.data.length > 0) {
+      for (let i = 0; i < this.data.length; i++) {
+        sum += this.data[i].temperature;
+      }
+      return sum / this.data.length;
+    }
+
+    return sum;
+  }
+}
+
+let weather = new Weather();
+weather.report({ temperature: 25, humidity: 60 });
+weather.report({ temperature: 30, humidity: 70 });
+
+console.log(weather.getAverageTemperature());
