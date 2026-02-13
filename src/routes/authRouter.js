@@ -102,4 +102,6 @@ function readAuthToken(req) {
 module.exports = {
   authRouter,
   setAuthUser,
+  authenticateToken,
+  setAuth,
 };

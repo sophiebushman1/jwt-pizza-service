@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "run": "cd src && node index.js",
-    "test": "jest",
+    "test": "jest --coverage",
     "lint": "eslint ."
   },
   "license": "MIT",
@@ -27,8 +27,7 @@
     "collectCoverage": true,
     "coverageReporters": ["json-summary", "text", "lcov"],
     "coveragePathIgnorePatterns": [
-      "/node_modules/",
-      "/src/database/"
+      "/node_modules/"
     ],
     "coverageThreshold": {
       "global": {
