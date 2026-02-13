@@ -8,8 +8,12 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Build & Test
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
+
+    # ===== MySQL service =====
     services:
       mysql:
         image: mysql:8.0.29
@@ -19,25 +23,32 @@ jobs:
         ports:
           - '3306:3306'
         options: >-
-          --health-cmd "mysqladmin ping -ptempdbpassword" --health-interval 10s --health-start-period 10s --health-timeout 5s --health-retries 10
-    outputs:
-      version: ${{ steps.set_version.outputs.version }}
+          --health-cmd "mysqladmin ping -ptempdbpassword"
+          --health-interval 10s
+          --health-start-period 10s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
+      # 1. Checkout code
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      # 2. Setup Node.js
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22.x'
 
+      # 3. Install dependencies
       - name: Install dependencies
         run: npm ci
 
+      # 4. Lint
       - name: Lint
         run: npm run lint
 
+      # 5. Write config.js (connects to MySQL service)
       - name: Write config file
         run: |
           echo "module.exports = {
@@ -58,9 +69,11 @@ jobs:
             },
           };" > src/config.js
 
-      - name: Tests
-        run: npm test
+      # 6. Run Jest tests with coverage
+      - name: Run Tests
+        run: npm test -- --coverage --runInBand
 
+      # 7. Create version file
       - name: set version
         id: set_version
         run: |
@@ -68,8 +81,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           printf '{"version": "%s" }' "$version" > src/version.json
 
-      - name: Update coverage
+      # 8. Update coverage badge
+      - name: Update coverage badge
         run: |
           coverage=$(jq '.total.lines.pct' coverage/coverage-summary.json)
           color=$(echo "$coverage < 80" | bc | awk '{if ($1) print "red"; else print "green"}')
-          curl -s -X POST "https://pizza-factory.cs329.click/api/badge/${{ secrets.NET_ID }}/jwtpizzaservicecoverage?label=Coverage&value=$coverage%25&color=$color" -H "authorization: bearer ${{ secrets.FACTORY_API_KEY }}"
+          curl -s -X POST "https://pizza-factory.cs329.click/api/badge/${{ secrets.NET_ID }}/jwtpizzaservicecoverage?label=Coverage&value=$coverage%25&color=$color" \
+          -H "authorization: bearer ${{ secrets.FACTORY_API_KEY }}"
