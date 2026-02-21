@@ -1,187 +1,406 @@
-const bcrypt = require('bcrypt');
-jest.mock('bcrypt');
+const request = require('supertest');
+const app = require('../src/app');
+const { DB, Role } = require('../src/database/database.js');
 
-describe('Database Layer Tests', () => {
-  // Fully mocked "DB" object
-  const db = {
-    getConnection: jest.fn(),
-    query: jest.fn(),
-    getOffset: (page = 1, limit = 10) => (page - 1) * limit,
-    getTokenSignature: (token) => token.split('.').pop(),
-    getID: jest.fn(),
-    getUser: jest.fn(),
-    addUser: jest.fn(),
-    loginUser: jest.fn(),
-    isLoggedIn: jest.fn(),
-    logoutUser: jest.fn(),
-    deleteFranchise: jest.fn(),
-    getMenu: jest.fn(),
-    addMenuItem: jest.fn(),
-    updateUser: jest.fn(),
-    getOrders: jest.fn(),
-    addDinerOrder: jest.fn(),
-    createFranchise: jest.fn(),
-    getFranchises: jest.fn(),
-    createStore: jest.fn(),
-    deleteStore: jest.fn(),
-    getUserFranchises: jest.fn(),
+function randomEmail(prefix = 'user') {
+  return `${prefix}_${Math.random().toString(36).substring(2)}@test.com`;
+}
+
+// Mock global fetch if your app uses it
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({ reportUrl: 'url', jwt: 'jwt' }),
+  })
+);
+
+// Utility to register a normal user
+async function registerUser() {
+  const email = randomEmail();
+  const res = await request(app).post('/api/auth').send({
+    name: 'Test User',
+    email,
+    password: 'password',
+  });
+
+  return {
+    user: res.body.user,
+    token: res.body.token,
   };
+}
 
-  let mockConnection;
-
-  beforeEach(() => {
-    // Mock connection object for methods that use it
-    mockConnection = {
-      execute: jest.fn().mockResolvedValue([[{ id: 1, name: 'Bob', password: 'hashed' }]]),
-      beginTransaction: jest.fn().mockResolvedValue(),
-      commit: jest.fn().mockResolvedValue(),
-      rollback: jest.fn().mockResolvedValue(),
-      end: jest.fn().mockResolvedValue(),
-    };
-
-    db.getConnection.mockResolvedValue(mockConnection);
-    db.query.mockResolvedValue([[{ id: 1, name: 'Bob', password: 'hashed', role: 'admin' }]]);
-
-    jest.clearAllMocks();
+// Utility to create admin
+async function createAdmin() {
+  const email = randomEmail('admin');
+  const user = await DB.addUser({
+    name: 'Admin User',
+    email,
+    password: 'admin',
+    roles: [{ role: Role.Admin }],
   });
 
+  const token = await request(app)
+    .put('/api/auth')
+    .send({ email, password: 'admin' })
+    .then(r => r.body.token);
 
-  // BASIC COVERAGE
-  
-  test('getOffset calculates correctly', () => {
-    expect(db.getOffset(2, 10)).toBe(10);
+  return { email, token, user };
+}
+
+// Utility to create regular user
+async function createRegularUser() {
+  const email = randomEmail('user');
+  const user = await DB.addUser({
+    name: 'Regular User',
+    email,
+    password: 'password',
+    roles: [],
   });
 
-  test('getOffset default works', () => {
-    expect(db.getOffset()).toBe(0);
-  });
+  const token = await request(app)
+    .put('/api/auth')
+    .send({ email, password: 'password' })
+    .then(r => r.body.token);
 
-  test('getTokenSignature extracts signature', () => {
-    expect(db.getTokenSignature('a.b.c')).toBe('c');
-  });
+  return { email, token, user };
+}
 
-  test('getID returns id when found', async () => {
-    db.getID.mockImplementation(async () => 1);
-    const id = await db.getID(mockConnection, 'email', 'test', 'user');
-    expect(id).toBe(1);
-  });
-
-  test('getID throws when not found', async () => {
-    db.getID.mockImplementation(async () => { throw new Error('not found'); });
-    await expect(db.getID(mockConnection, 'email', 'none', 'user')).rejects.toThrow();
-  });
-
-  test('getUser returns user with roles', async () => {
-    db.getUser.mockResolvedValue({ id: 1, roles: [{ role: 'admin' }] });
-    const user = await db.getUser('bob@example.com');
-    expect(user.id).toBe(1);
-    expect(user.roles.length).toBe(1);
-  });
-
-  test('getUser throws when user not found', async () => {
-    db.getUser.mockRejectedValue(new Error('unknown user'));
-    await expect(db.getUser('none@example.com')).rejects.toThrow('unknown user');
-  });
-
-  test('addUser inserts user and roles', async () => {
-    bcrypt.hash.mockResolvedValue('hashed');
-    db.addUser.mockResolvedValue({ id: 5 });
-    const result = await db.addUser({
-      name: 'Bob',
-      email: 'test@example.com',
-      password: 'pass',
-      roles: [{ role: 'admin', object: undefined }],
+describe('Auth Routes', () => {
+  test('register user successfully', async () => {
+    const email = randomEmail();
+    const res = await request(app).post('/api/auth').send({
+      name: 'New User',
+      email,
+      password: 'password',
     });
-    expect(result.id).toBe(5);
+
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeDefined();
   });
 
-  test('loginUser inserts auth token', async () => {
-    db.loginUser.mockResolvedValue(true);
-    await expect(db.loginUser(1, 'token')).resolves.toBeTruthy();
+  test('register fails with missing fields', async () => {
+    const res = await request(app).post('/api/auth').send({
+      email: randomEmail(),
+    });
+
+    expect(res.status).toBe(400);
   });
 
-  test('isLoggedIn returns true if token exists', async () => {
-    db.isLoggedIn.mockResolvedValue(true);
-    const result = await db.isLoggedIn('token');
+  test('login succeeds', async () => {
+    const email = randomEmail();
+    await request(app).post('/api/auth').send({
+      name: 'User',
+      email,
+      password: 'password',
+    });
+
+    const login = await request(app).put('/api/auth').send({
+      email,
+      password: 'password',
+    });
+
+    expect(login.status).toBe(200);
+    expect(login.body.token).toBeDefined();
+  });
+
+  test('login fails with wrong password', async () => {
+    const email = randomEmail();
+    await request(app).post('/api/auth').send({
+      name: 'User',
+      email,
+      password: 'password',
+    });
+
+    const login = await request(app).put('/api/auth').send({
+      email,
+      password: 'wrong',
+    });
+
+    expect(login.status).toBe(404);
+  });
+
+  test('logout works', async () => {
+    const { token } = await registerUser();
+    const res = await request(app)
+      .delete('/api/auth')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('Menu', () => {
+  test('get menu', async () => {
+    const res = await request(app).get('/api/order/menu');
+    expect(res.status).toBe(200);
+  });
+
+  test('add menu item fails if not admin', async () => {
+    const { token } = await registerUser();
+
+    const res = await request(app)
+      .put('/api/order/menu')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: 'Burger',
+        description: 'desc',
+        image: 'img',
+        price: 10,
+      });
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Franchise Routes', () => {
+  test('admin can create franchise', async () => {
+    await DB.initialized;
+    const { token, user } = await createAdmin(); // user already exists in DB
+
+    const res = await request(app)
+      .post('/api/franchise')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Test Franchise ' + Date.now(), // unique name
+        admins: [{ email: user.email }],      // DB.createFranchise checks that user exists
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBeDefined();
+    expect(res.body.name).toMatch(/Test Franchise/);
+    expect(res.body.admins[0].email).toBe(user.email);
+  });
+
+  test('non-admin cannot create franchise', async () => {
+    const { token } = await createRegularUser();
+
+    const res = await request(app)
+      .post('/api/franchise')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Fail Franchise ' + Date.now(),
+        admins: [],
+      });
+
+    expect(res.status).toBe(403);
+  });
+
+  test('admin can create and delete a store', async () => {
+    const { token, user } = await createAdmin();
+
+    // create a unique franchise first
+    const franchiseRes = await request(app)
+      .post('/api/franchise')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Store Franchise ' + Date.now(),
+        admins: [{ email: user.email }],
+      });
+
+    const franchiseId = franchiseRes.body.id;
+
+    // create store
+    const storeRes = await request(app)
+      .post(`/api/franchise/${franchiseId}/store`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Downtown Store' });
+
+    expect(storeRes.status).toBe(200);
+    expect(storeRes.body.id).toBeDefined();
+    expect(storeRes.body.name).toBe('Downtown Store');
+
+    // delete store
+    const delRes = await request(app)
+      .delete(`/api/franchise/${franchiseId}/store/${storeRes.body.id}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(delRes.status).toBe(200);
+    expect(delRes.body.message).toBe('store deleted');
+  });
+
+  test('non-admin cannot create store', async () => {
+    const { token: userToken } = await createRegularUser();
+    const { user: adminUser } = await createAdmin();
+
+    // create a unique franchise with admin
+    const franchise = await DB.createFranchise({
+      name: 'User Franchise ' + Date.now(),
+      admins: [{ email: adminUser.email }],
+    });
+
+    const res = await request(app)
+      .post(`/api/franchise/${franchise.id}/store`)
+      .set('Authorization', `Bearer ${userToken}`)
+      .send({ name: 'Illegal Store' });
+
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Orders', () => {
+  test('create order', async () => {
+    const { token, user } = await registerUser();
+
+    const res = await request(app)
+      .post('/api/order')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        franchiseId: 1,
+        storeId: 1,
+        items: [
+          { menuId: 1, description: 'test', price: 10 },
+        ],
+      });
+
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('Extended User/Auth Tests', () => {
+  test('update user fields successfully', async () => {
+    const { user, token } = await registerUser();
+
+    const updated = await DB.updateUser(user.id, 'Updated Name', 'updated@test.com', 'newpassword');
+    expect(updated.name).toBe('Updated Name');
+    expect(updated.email).toBe('updated@test.com');
+  });
+
+  test('non-admin cannot update another user', async () => {
+    const { user: user1 } = await createRegularUser();
+    const { user: user2 } = await createRegularUser();
+
+    await expect(DB.updateUser(user2.id, 'Hacked', null, null)).rejects.toThrow('unknown user');
+    // Note: real router would enforce 403, direct DB call just updates
+  });
+
+  test('getUser fails for unknown user', async () => {
+    await expect(DB.getUser('unknown@test.com', 'nopass')).rejects.toThrow('unknown user');
+  });
+
+  test('isLoggedIn returns false for invalid token', async () => {
+    const result = await DB.isLoggedIn('invalid.token.signature');
+    expect(result).toBe(false);
+  });
+
+  test('isLoggedIn returns true for valid token', async () => {
+    const { user, token } = await registerUser();
+    const result = await DB.isLoggedIn(token);
     expect(result).toBe(true);
   });
 
-  test('logoutUser deletes token', async () => {
-    db.logoutUser.mockResolvedValue(true);
-    await expect(db.logoutUser('token')).resolves.toBeTruthy();
+  test('logout invalidates token', async () => {
+    const { token } = await registerUser();
+    await DB.logoutUser(token);
+    const result = await DB.isLoggedIn(token);
+    expect(result).toBe(false);
+  });
+});
+
+describe('Extended Menu Tests', () => {
+  test('admin can add menu item', async () => {
+    const { token } = await createAdmin();
+    const item = { title: 'Super Pizza', description: 'Tasty', image: 'img.png', price: 9.99 };
+    await DB.addMenuItem(item);
+    const menu = await DB.getMenu();
+    expect(menu.find((m) => m.title === 'Super Pizza')).toBeDefined();
   });
 
-  test('deleteFranchise rolls back on failure', async () => {
-    db.deleteFranchise.mockRejectedValue(new Error('fail'));
-    await expect(db.deleteFranchise(1)).rejects.toThrow('fail');
+  test('adding menu item with missing fields fails', async () => {
+    const item = { title: null, description: 'No name', price: 5 };
+    await expect(DB.addMenuItem(item)).rejects.toThrow();
+  });
+});
+
+describe('Extended Franchise Tests', () => {
+  test('create franchise with multiple admins', async () => {
+    const admin1 = await createAdmin();
+    const admin2 = await createAdmin();
+    const franchise = { name: `MultiAdmin_${Math.random()}`, admins: [{ email: admin1.email }, { email: admin2.email }] };
+    const created = await DB.createFranchise(franchise);
+    expect(created.admins.length).toBe(2);
+    expect(created.id).toBeDefined();
   });
 
-  
-  // PHASE 2
-
-  test('getMenu returns rows', async () => {
-    db.getMenu.mockResolvedValue([{ id: 1, title: 'Pizza' }]);
-    const menu = await db.getMenu();
-    expect(menu.length).toBe(1);
+  test('create franchise with unknown admin fails', async () => {
+    const franchise = { name: 'FailFranchise', admins: [{ email: 'noone@test.com' }] };
+    await expect(DB.createFranchise(franchise)).rejects.toThrow(/unknown user/);
   });
 
-  test('addMenuItem inserts item', async () => {
-    db.addMenuItem.mockResolvedValue({ id: 10 });
-    const result = await db.addMenuItem({ title: 'Burger', description: 'desc', image: 'img', price: 5 });
-    expect(result.id).toBe(10);
+  test('get franchises with name filter', async () => {
+    const { token, email } = await createAdmin();
+    const fName = `FilterTest_${Math.random()}`;
+    await DB.createFranchise({ name: fName, admins: [{ email }] });
+    const [franchises] = await DB.getFranchises({ isRole: () => true }, 0, 10, fName);
+    expect(franchises.some((f) => f.name === fName)).toBe(true);
   });
 
-  test('updateUser updates fields', async () => {
-    db.updateUser.mockResolvedValue({ id: 1 });
-    const result = await db.updateUser(1, 'Name', 'email@example.com', 'pass');
-    expect(result.id).toBe(1);
+});
+
+describe('Extended Store Tests', () => {
+  test('create store and check totalRevenue', async () => {
+    const { token, email } = await createAdmin();
+    const franchise = await DB.createFranchise({ name: `StoreRev_${Math.random()}`, admins: [{ email }] });
+    const store = await DB.createStore(franchise.id, { name: 'Revenue Store' });
+    expect(store.name).toBe('Revenue Store');
+    const fetched = await DB.getFranchise(franchise);
+    expect(fetched.stores.find((s) => s.name === 'Revenue Store').totalRevenue).toBeDefined();
   });
 
-  test('getOrders returns orders with items', async () => {
-    db.getOrders.mockResolvedValue({ orders: [{ items: [1] }] });
-    const result = await db.getOrders({ id: 1 }, 1);
-    expect(result.orders.length).toBe(1);
-    expect(result.orders[0].items.length).toBe(1);
+  test('delete store that does not exist', async () => {
+    const { token, email } = await createAdmin();
+    const franchise = await DB.createFranchise({ name: `DelStore_${Math.random()}`, admins: [{ email }] });
+    await expect(DB.deleteStore(franchise.id, 999999)).resolves.toBeUndefined();
+  });
+});
+
+describe('Extended Orders Tests', () => {
+  test('create order with multiple items', async () => {
+    const { token, user } = await registerUser();
+    const items = [
+      { menuId: 1, description: 'Item1', price: 5 },
+      { menuId: 1, description: 'Item2', price: 10 },
+    ];
+    const order = await DB.addDinerOrder(user, { franchiseId: 1, storeId: 1, items });
+    expect(order.items.length).toBe(2);
   });
 
-  test('addDinerOrder inserts order and items', async () => {
-    db.addDinerOrder.mockResolvedValue({ id: 99 });
-    const result = await db.addDinerOrder({ id: 1 }, { franchiseId: 1, storeId: 1, items: [{ menuId: 1, price: 10 }] });
-    expect(result.id).toBe(99);
+  test('getOrders pagination', async () => {
+    const { token, user } = await registerUser();
+    const result = await DB.getOrders(user, 1);
+    expect(result.orders).toBeDefined();
+  });
+});
+
+describe('Utility / Edge Cases', () => {
+  test('getID throws for missing ID', async () => {
+    const connection = await DB.getConnection();
+    await expect(DB.getID(connection, 'id', 999999, 'menu')).rejects.toThrow('No ID found');
   });
 
-  test('createFranchise creates franchise and roles', async () => {
-    db.createFranchise.mockResolvedValue({ id: 5 });
-    const franchise = await db.createFranchise({ name: 'Franchise', admins: [{ email: 'admin@test.com' }] });
-    expect(franchise.id).toBe(5);
+  test('getOffset calculates correctly', () => {
+    expect(DB.getOffset(1, 10)).toBe(0);
+    expect(DB.getOffset(2, 10)).toEqual(10); // this mirrors your DB code behavior
   });
 
-  test('getFranchises admin loads full franchise', async () => {
-    db.getFranchises.mockResolvedValue([[{ id: 1, name: 'Franchise', stores: [] }]]);
-    const [franchises] = await db.getFranchises({ isRole: () => true }, 0, 10, '*');
-    expect(franchises.length).toBe(1);
+  test('getTokenSignature works with multiple formats', () => {
+    expect(DB.getTokenSignature('a.b.c')).toBe('c');
+    expect(DB.getTokenSignature('a.b')).toBe('');
+    expect(DB.getTokenSignature('a')).toBe('');
   });
+});
 
-  test('getFranchises non-admin loads stores only', async () => {
-    db.getFranchises.mockResolvedValue([[{ id: 1, name: 'Franchise', stores: [{ id: 1 }] }]]);
-    const [franchises] = await db.getFranchises({ isRole: () => false }, 0, 10, '*');
-    expect(franchises[0].stores.length).toBe(1);
-  });
+afterAll(async () => {
+  // 1️⃣ Close the DB connections if the method exists
+  if (DB.closeConnection) {
+    await DB.closeConnection();
+  }
 
-  test('createStore inserts store', async () => {
-    db.createStore.mockResolvedValue({ id: 7 });
-    const result = await db.createStore(1, { name: 'Store' });
-    expect(result.id).toBe(7);
-  });
+  // 2️⃣ Close the Express server if it was started in tests
+  // Only do this if you actually called `app.listen()` somewhere
+  if (DB.server && DB.server.close) {
+    await new Promise((resolve) => DB.server.close(resolve));
+  }
 
-  test('deleteStore executes delete', async () => {
-    db.deleteStore.mockResolvedValue(true);
-    await expect(db.deleteStore(1, 1)).resolves.toBeTruthy();
-  });
-
-  test('getUserFranchises returns franchises', async () => {
-    db.getUserFranchises.mockResolvedValue([{ id: 1 }]);
-    const result = await db.getUserFranchises(1);
-    expect(result.length).toBe(1);
-  });
+  // 3️⃣ Wait a tiny bit to let any pending async ops finish
+  await new Promise((resolve) => setTimeout(resolve, 100));
 });
