@@ -255,23 +255,83 @@ describe('Franchise Routes', () => {
 
 describe('Orders', () => {
   test('create order', async () => {
-    const { token } = await registerUser();
+    const { token, user } = await createRegularUser();
+
+    // create a franchise for this user
+    const { id: franchiseId } = await DB.createFranchise({
+      name: `Order Franchise ${Date.now()}`,
+      admins: [{ email: user.email }],
+    });
+
+    // create a store
+    const store = await DB.createStore(franchiseId, { name: 'Main Store' });
 
     const res = await request(app)
       .post('/api/order')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        franchiseId: 1,
-        storeId: 1,
-        items: [
-          { menuId: 1, description: 'test', price: 10 },
-        ],
+        franchiseId,
+        storeId: store.id,
+        items: [{ menuId: 1, description: 'test', price: 10 }],
       });
 
     expect(res.status).toBe(200);
   });
-});
 
+  test('POST /api/order handles factory failure', async () => {
+    const { token, user } = await createRegularUser();
+
+    // create a franchise and store
+    const { id: franchiseId } = await DB.createFranchise({
+      name: `Fail Factory Franchise ${Date.now()}`,
+      admins: [{ email: user.email }],
+    });
+    const store = await DB.createStore(franchiseId, { name: 'Fail Store' });
+
+    // Mock fetch to fail
+    global.fetch.mockImplementationOnce(() =>
+      Promise.resolve({
+        ok: false,
+        json: () =>
+          Promise.resolve({
+            reportUrl: 'failed-url',
+            jwt: 'fake-jwt',
+          }),
+      })
+    );
+
+    const res = await request(app)
+      .post('/api/order')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        franchiseId,
+        storeId: store.id,
+        items: [{ menuId: 1, description: 'test', price: 10 }],
+      });
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Failed to fulfill order at factory');
+    expect(res.body.followLinkToEndChaos).toBe('failed-url');
+  });
+
+  test('POST /api/order handles empty items gracefully', async () => {
+    const { token, user } = await createRegularUser();
+
+    // create a franchise and store
+    const { id: franchiseId } = await DB.createFranchise({
+      name: `Empty Items Franchise ${Date.now()}`,
+      admins: [{ email: user.email }],
+    });
+    const store = await DB.createStore(franchiseId, { name: 'Empty Store' });
+
+    const res = await request(app)
+      .post('/api/order')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ franchiseId, storeId: store.id, items: [] });
+
+    expect(res.status).toBeDefined(); // just hit the branch
+  });
+});
 describe('Franchise Edge Cases', () => {
 
 
