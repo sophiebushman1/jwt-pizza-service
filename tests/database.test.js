@@ -255,7 +255,7 @@ describe('Franchise Routes', () => {
 
 describe('Orders', () => {
   test('create order', async () => {
-    const { token, user } = await registerUser();
+    const { token } = await registerUser();
 
     const res = await request(app)
       .post('/api/order')
@@ -293,14 +293,17 @@ describe('Franchise Edge Cases', () => {
 
 test('GET /franchise/:userId returns franchises for admin', async () => {
   const { token, user } = await createAdmin();
-  const franchise = await DB.createFranchise({
-    name: 'Admin Franchise ' + Date.now(),
+
+  // Create a franchise for this admin
+  await DB.createFranchise({
+    name: `Admin Test Franchise ${Date.now()}`,
     admins: [{ email: user.email }],
   });
 
   const res = await request(app)
     .get(`/api/franchise/${user.id}`)
     .set('Authorization', `Bearer ${token}`);
+
   expect(res.status).toBe(200);
   expect(res.body.length).toBeGreaterThan(0);
 });
@@ -315,7 +318,7 @@ test('GET /franchise returns franchises for regular user', async () => {
 });
 
 test('POST /api/order handles factory failure', async () => {
-  const { token, user } = await registerUser();
+  const { token } = await registerUser();
 
   // Mock fetch to fail
   global.fetch.mockImplementationOnce(() =>
@@ -353,8 +356,6 @@ test('POST /api/order handles factory failure', async () => {
   });
 
   test('POST /api/order handles empty items gracefully', async () => {
-    const userEmail = `orderedge_${Date.now()}@test.com`;
-    const user = await DB.addUser({ name: 'EdgeUser', email: userEmail, password: 'pass', roles: [] });
 
     const res = await request(app)
       .post('/api/order')
@@ -366,20 +367,20 @@ test('POST /api/order handles factory failure', async () => {
   });
 
 describe('DB missing functionality coverage', () => {
-  let user;
-
   it('getOffset returns correct calculation', () => {
     const offset = DB.getOffset(3, 10); // page 3, 10 per page
     expect(offset).toBe(20); // hits getOffset function
   });
 
   it('createFranchise throws on unknown admin email', async () => {
+    // no need to assign result to a variable
     await expect(
       DB.createFranchise({ name: 'TestFranchise', admins: [{ email: 'unknown@jwt.com' }] })
     ).rejects.toThrow(/unknown user for franchise admin/); // hits createFranchise error branch
   });
 
   it('getUserFranchises returns empty array if no franchises', async () => {
+    // no need to assign user variable if just testing return
     const franchises = await DB.getUserFranchises(999999); // a user ID that doesn’t exist
     expect(franchises).toEqual([]); // hits getUserFranchises early return
   });
