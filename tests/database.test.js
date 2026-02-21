@@ -390,17 +390,14 @@ describe('Utility / Edge Cases', () => {
 });
 
 afterAll(async () => {
-  // 1️⃣ Close the DB connections if the method exists
+
   if (DB.closeConnection) {
     await DB.closeConnection();
   }
 
-  // 2️⃣ Close the Express server if it was started in tests
-  // Only do this if you actually called `app.listen()` somewhere
   if (DB.server && DB.server.close) {
     await new Promise((resolve) => DB.server.close(resolve));
   }
 
-  // 3️⃣ Wait a tiny bit to let any pending async ops finish
   await new Promise((resolve) => setTimeout(resolve, 100));
 });
