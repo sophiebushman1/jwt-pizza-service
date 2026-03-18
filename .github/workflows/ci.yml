@@ -127,6 +127,7 @@ jobs:
             --push \
             .
 
+
       - name: Deploy new container
         run: |
           aws ecs update-service \
