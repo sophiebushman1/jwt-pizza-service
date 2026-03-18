@@ -1,5 +1,6 @@
 const express = require('express');
 const app = express();
+const metrics = require('./metrics');
 
 const { setAuthUser } = require('./routes/authRouter');
 
@@ -9,6 +10,8 @@ const orderRouter = require('./routes/orderRouter');
 const userRouter = require('./routes/userRouter');
 
 app.use(express.json());
+
+app.use(metrics.requestTracker);
 
 app.use(setAuthUser);
 
