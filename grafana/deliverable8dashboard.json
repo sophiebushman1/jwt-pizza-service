@@ -62,31 +62,31 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(http_requests_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(http_requests_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "Total",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(http_requests_get_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(http_requests_get_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "GET",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(http_requests_post_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(http_requests_post_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "POST",
           "refId": "C"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(http_requests_put_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(http_requests_put_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "PUT",
           "refId": "D"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(http_requests_delete_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(http_requests_delete_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "DELETE",
           "refId": "E"
         }
@@ -125,7 +125,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "active_users{source=\"jwt-pizza-service\"}",
+          "expr": "active_users{source=~\"jwt-pizza-service.*\"}",
           "legendFormat": "Active Users",
           "refId": "A"
         }
@@ -166,13 +166,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "cpu_percent{source=\"jwt-pizza-service\"}",
+          "expr": "cpu_percent{source=~\"jwt-pizza-service.*\"}",
           "legendFormat": "CPU %",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "memory_percent{source=\"jwt-pizza-service\"}",
+          "expr": "memory_percent{source=~\"jwt-pizza-service.*\"}",
           "legendFormat": "Memory %",
           "refId": "B"
         }
@@ -215,13 +215,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(auth_success_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(auth_success_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "Success",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(auth_failure_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(auth_failure_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "Failure",
           "refId": "B"
         }
@@ -255,19 +255,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(pizza_sold_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(pizza_sold_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "Sold / min",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(pizza_failures_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(pizza_failures_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "Failures / min",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(pizza_revenue_total{source=\"jwt-pizza-service\"}[1m]) / 10000",
+          "expr": "rate(pizza_revenue_total{source=~\"jwt-pizza-service.*\"}[1m]) / 10000",
           "legendFormat": "Revenue $ / min",
           "refId": "C"
         }
@@ -303,13 +303,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(service_latency_milliseconds_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(service_latency_milliseconds_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "Service Endpoint",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "expr": "rate(pizza_latency_milliseconds_total{source=\"jwt-pizza-service\"}[1m])",
+          "expr": "rate(pizza_latency_milliseconds_total{source=~\"jwt-pizza-service.*\"}[1m])",
           "legendFormat": "Pizza Creation",
           "refId": "B"
         }
