@@ -145,33 +145,37 @@ class Metrics {
   }
 
   sendAllMetrics() {
+    // OTel→Prometheus name rules:
+    //   gauge + unit '%'  → {name}_percent
+    //   sum   + unit '1'  → {name}_total
+    //   sum   + unit 'ms' → {name}_milliseconds_total
     const metrics = [
-      // HTTP requests
-      this.buildSum('requests_total', '1', this.totalRequests),
-      this.buildSum('requests_get', '1', this.getRequests),
-      this.buildSum('requests_put', '1', this.putRequests),
-      this.buildSum('requests_post', '1', this.postRequests),
-      this.buildSum('requests_delete', '1', this.deleteRequests),
+      // HTTP requests  → http_requests_total, http_requests_get_total, etc.
+      this.buildSum('http_requests', '1', this.totalRequests),
+      this.buildSum('http_requests_get', '1', this.getRequests),
+      this.buildSum('http_requests_put', '1', this.putRequests),
+      this.buildSum('http_requests_post', '1', this.postRequests),
+      this.buildSum('http_requests_delete', '1', this.deleteRequests),
 
-      // Active users
+      // Active users  → active_users  (gauge, no suffix)
       this.buildGauge('active_users', '1', this.activeUsers),
 
-      // Auth
+      // Auth  → auth_success_total, auth_failure_total
       this.buildSum('auth_success', '1', this.authSuccesses),
       this.buildSum('auth_failure', '1', this.authFailures),
 
-      // System
-      this.buildGauge('cpu_percent', '%', this.getCpuUsagePercentage()),
-      this.buildGauge('memory_percent', '%', this.getMemoryUsagePercentage()),
+      // System  → cpu_percent, memory_percent
+      this.buildGauge('cpu', '%', this.getCpuUsagePercentage()),
+      this.buildGauge('memory', '%', this.getMemoryUsagePercentage()),
 
-      // Pizzas
+      // Pizzas  → pizza_sold_total, pizza_failures_total, pizza_revenue_total
       this.buildSum('pizza_sold', '1', this.pizzasSold),
       this.buildSum('pizza_failures', '1', this.pizzaFailures),
-      this.buildSum('pizza_revenue_cents', '1', this.pizzaRevenueCents),
+      this.buildSum('pizza_revenue', '1', this.pizzaRevenueCents),
 
-      // Latency
-      this.buildSum('service_latency_ms', 'ms', this.serviceLatencyTotal),
-      this.buildSum('pizza_latency_ms', 'ms', this.pizzaLatencyTotal),
+      // Latency  → service_latency_milliseconds_total, pizza_latency_milliseconds_total
+      this.buildSum('service_latency', 'ms', this.serviceLatencyTotal),
+      this.buildSum('pizza_latency', 'ms', this.pizzaLatencyTotal),
     ];
 
     const body = JSON.stringify({
