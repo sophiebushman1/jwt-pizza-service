@@ -186,10 +186,12 @@ class Metrics {
       ],
     });
 
+    const authHeader = 'Basic ' + Buffer.from(`${config.metrics.accountId}:${config.metrics.apiKey}`).toString('base64');
+
     fetch(config.metrics.endpointUrl, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${config.metrics.accountId}:${config.metrics.apiKey}`,
+        Authorization: authHeader,
         'Content-Type': 'application/json',
       },
       body,
@@ -197,6 +199,8 @@ class Metrics {
       .then((response) => {
         if (!response.ok) {
           response.text().then((text) => console.error(`Failed to push metrics to Grafana: ${text}`));
+        } else {
+          console.log('Metrics sent to Grafana successfully');
         }
       })
       .catch((error) => console.error('Error pushing metrics:', error));
