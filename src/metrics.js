@@ -3,6 +3,8 @@ const config = require('./config.js');
 
 class Metrics {
   constructor() {
+    this.startTime = Date.now(); // used as startTimeUnixNano for cumulative sums
+
     // HTTP request counters
     this.totalRequests = 0;
     this.getRequests = 0;
@@ -122,6 +124,7 @@ class Metrics {
         dataPoints: [
           {
             asInt: Math.round(value),
+            startTimeUnixNano: String(this.startTime * 1_000_000),
             timeUnixNano: String(Date.now() * 1_000_000),
             attributes: [{ key: 'source', value: { stringValue: config.metrics.source } }],
           },
