@@ -10,7 +10,7 @@ class Logger {
         method: req.method,
         path: req.originalUrl,
         statusCode: res.statusCode,
-        reqBody: req.body ? JSON.stringify(req.body) : '',
+        reqBody: req.body ? JSON.stringify(this.sanitizeObj(req.body)) : '',
         resBody: JSON.stringify(resBody),
       };
       this.log(this.statusToLogLevel(res.statusCode), 'http', logData);
@@ -58,11 +58,18 @@ class Logger {
     return (Math.floor(Date.now()) * 1_000_000).toString();
   }
 
+  // ── Sanitize an object before stringifying (handles nested JSON bodies) ─────
+  sanitizeObj(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    const copy = { ...obj };
+    if ('password' in copy) copy.password = '*****';
+    return copy;
+  }
+
   sanitize(logData) {
     let str = JSON.stringify(logData);
-    // Mask passwords in any format they might appear
+    // Fallback: mask any "password":"..." patterns still present in the string
     str = str.replace(/"password"\s*:\s*"[^"]*"/g, '"password": "*****"');
-    str = str.replace(/\\"password\\"\s*:\s*\\"[^"]*\\"/g, '\\"password\\": \\"*****\\"');
     return str;
   }
 

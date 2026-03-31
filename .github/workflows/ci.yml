@@ -134,7 +134,7 @@ jobs:
           ECR_REPOSITORY: jwt-pizza-service
         run: |
           docker buildx build \
-            --platform linux/amd64 \
+            --platform linux/arm64 \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             --push \
             .
